@@ -5,19 +5,26 @@
   "type": "module",
   "main": "server.js",
   "bin": {
-    "lamdera-collab-mcp": "./server.js"
+    "lamdera-collab-mcp": "server.js"
   },
   "scripts": {
     "start": "node server.js",
     "test": "node test-schema.js",
     "test:integration": "node test-comprehensive.js --key test_key_all_projects_123"
   },
-  "keywords": ["mcp", "model-context-protocol", "collaboration", "project-management", "lamdera", "elm"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "collaboration",
+    "project-management",
+    "lamdera",
+    "elm"
+  ],
   "author": "Klaar",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sjalq/lamdera-collab-mcp.git"
+    "url": "git+https://github.com/sjalq/lamdera-collab-mcp.git"
   },
   "engines": {
     "node": ">=18.0.0"
