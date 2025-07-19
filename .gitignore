@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.env*
+.DS_Store
+delete_when_done/
+package-lock.json 
