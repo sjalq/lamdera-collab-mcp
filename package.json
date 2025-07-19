@@ -1,0 +1,31 @@
+{
+  "name": "lamdera-collab-mcp",
+  "version": "1.0.0",
+  "description": "Minimalist MCP server for collaborative project management with Lamdera backend integration",
+  "type": "module",
+  "main": "server.js",
+  "bin": {
+    "lamdera-collab-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-schema.js",
+    "test:integration": "node test-comprehensive.js --key test_key_all_projects_123"
+  },
+  "keywords": ["mcp", "model-context-protocol", "collaboration", "project-management", "lamdera", "elm"],
+  "author": "Klaar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/lamdera-collab-mcp.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.16.1"
+  }
+}

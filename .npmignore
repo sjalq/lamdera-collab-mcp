@@ -1,0 +1,7 @@
+test*.js
+*.log
+.env*
+node_modules/
+.git/
+.DS_Store
+delete_when_done/ 
