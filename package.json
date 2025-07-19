@@ -5,7 +5,7 @@
   "type": "module",
   "main": "server.js",
   "bin": {
-    "lamdera-collab-mcp": "./server.js"
+    "lamdera-collaboration-mcp": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
