@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "collab-mcp2": {
-      "command": "node",
-      "args": ["eww/collab-mcp2/server.js", "--url", "http://localhost:8000", "--key", "test_key_all_projects_123"]
+    "lamdera-collab-mcp": {
+      "command": "npx",
+      "args": ["@sjalq/lamdera-collab-mcp", "--url", "http://localhost:8000", "--key", "test_key_all_projects_123"]
     }
   }
 } 

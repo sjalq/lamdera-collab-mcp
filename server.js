@@ -8,7 +8,7 @@ class CollabMCP {
   constructor(apiUrl, apiKey) {
     this.apiUrl = apiUrl;
     this.apiKey = apiKey;
-    this.server = new Server({ name: 'collab-mcp2', version: '1.0.0' }, { capabilities: { tools: {} } });
+            this.server = new Server({ name: 'lamdera-collab-mcp', version: '1.0.0' }, { capabilities: { tools: {} } });
   }
 
   async callRPC(endpoint, params = {}) {

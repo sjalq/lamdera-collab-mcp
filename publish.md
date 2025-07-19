@@ -28,20 +28,20 @@ npm publish
 
 Test the published package:
 ```bash
-npx collab-mcp2 --url http://localhost:8000 --key test_key_all_projects_123
+npx @sjalq/lamdera-collab-mcp --url http://localhost:8000 --key test_key_all_projects_123
 ```
 
 ## Quick Usage
 
 Users can now run:
 ```bash
-npx collab-mcp2 --url YOUR_LAMDERA_URL --key YOUR_API_KEY
+npx @sjalq/lamdera-collab-mcp --url YOUR_LAMDERA_URL --key YOUR_API_KEY
 ```
 
 Or install globally:
 ```bash
-npm install -g collab-mcp2
-collab-mcp2 --url YOUR_LAMDERA_URL --key YOUR_API_KEY
+npm install -g @sjalq/lamdera-collab-mcp
+lamdera-collab-mcp --url YOUR_LAMDERA_URL --key YOUR_API_KEY
 ```
 
 ## MCP Client Config
@@ -49,9 +49,9 @@ collab-mcp2 --url YOUR_LAMDERA_URL --key YOUR_API_KEY
 ```json
 {
   "mcpServers": {
-    "collab-mcp2": {
+    "lamdera-collab-mcp": {
       "command": "npx",
-      "args": ["collab-mcp2", "--url", "http://localhost:8000", "--key", "YOUR_API_KEY"]
+      "args": ["@sjalq/lamdera-collab-mcp", "--url", "http://localhost:8000", "--key", "YOUR_API_KEY"]
     }
   }
 }

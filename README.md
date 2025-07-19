@@ -1,110 +1,90 @@
-# Collab MCP2
+# Lamdera Collab MCP
 
-Minimalist MCP server for Lamdera collaborative memory system with 18 tools covering projects, tasks, documents, comments, and activity tracking.
-
-## Quick Start
-
-```bash
-npx collab-mcp2 --url http://localhost:8000 --key YOUR_API_KEY
-```
+A Model Context Protocol (MCP) server that provides AI assistants with tools to interact with a Lamdera-based collaborative project management system. This server enables Claude and other MCP-compatible AI assistants to manage projects, tasks, documents, and comments programmatically.
 
 ## Installation
 
-### Global Install
 ```bash
-npm install -g collab-mcp2
-collab-mcp2 --url http://localhost:8000 --key YOUR_API_KEY
+npm install -g @sjalq/lamdera-collab-mcp
 ```
 
-### Local Development
+## Usage
+
+### Run directly with npx (no installation required)
 ```bash
-git clone https://github.com/your-username/collab-mcp2.git
-cd collab-mcp2
-npm install
-npm start -- --url http://localhost:8000 --key YOUR_API_KEY
+npx @sjalq/lamdera-collab-mcp --url YOUR_LAMDERA_URL --key YOUR_API_KEY
 ```
 
-## MCP Client Configuration
+### Run after global installation
+```bash
+lamdera-collab-mcp --url YOUR_LAMDERA_URL --key YOUR_API_KEY
+```
 
-Add to your MCP client config:
+## Configuration for AI Assistants
+
+Add this to your MCP client configuration (e.g., Claude Desktop):
 
 ```json
 {
   "mcpServers": {
-    "collab-mcp2": {
+    "lamdera-collab": {
       "command": "npx",
-      "args": ["collab-mcp2", "--url", "http://localhost:8000", "--key", "test_key_all_projects_123"]
+      "args": ["@sjalq/lamdera-collab-mcp", "--url", "YOUR_LAMDERA_URL", "--key", "YOUR_API_KEY"]
     }
   }
 }
 ```
 
-## Available Tools (18 total)
+## Available Tools
 
-### Projects
-- `list_projects` - List all accessible projects with pagination
-- `get_project` - Get specific project details by ID  
-- `create_project` - Create new project with description and tags
+This MCP server provides 18 tools organized into 5 categories:
 
-### Tasks
-- `list_tasks` - List tasks with filtering by project, status, assignee
-- `list_epics` - List epic-type tasks for project planning
-- `get_task` - Get specific task details by ID
-- `create_task` - Create new task (epic/story/task/bug/component)
-- `update_task` - Update task title, description, status, priority
+### Project Management
+- `list_projects` - View all accessible projects
+- `get_project` - Get detailed project information
+- `create_project` - Create new projects with tags
 
-### Documents  
-- `search_documents` - Search documents by content with scoring
-- `get_document` - Get specific document by ID
-- `create_document` - Create new document (plan/spec/notes/code/other)
-- `update_document` - Update document content and metadata
+### Task Management  
+- `list_tasks` - List and filter tasks by status, assignee, or project
+- `list_epics` - View high-level epics for planning
+- `get_task` - Get detailed task information
+- `create_task` - Create tasks (epics, stories, tasks, bugs)
+- `update_task` - Update task details and status
 
-### Comments
-- `list_task_comments` - List threaded comments for a task
-- `create_comment` - Add new comment with optional parent
-- `update_comment` - Update comment content (author only)
-- `get_comment` - Get specific comment by ID
-- `delete_comment` - Delete comment (author only)
+### Documentation
+- `search_documents` - Search project documentation
+- `get_document` - Retrieve specific documents
+- `create_document` - Create technical docs, specs, or notes
+- `update_document` - Update existing documentation
 
-### Activity
-- `get_recent_activity` - Get recent project activity across all accessible projects
+### Collaboration
+- `list_task_comments` - View task discussions
+- `create_comment` - Add comments to tasks
+- `update_comment` - Edit your comments
+- `get_comment` - Get comment details
+- `delete_comment` - Remove comments
 
-## Worker Attribution
-
-All creation/update tools support optional worker attribution:
-- `worker_type`: "dev", "pm", or "reviewer"  
-- `worker_name`: String identifier for the worker
-
-## API Keys
-
-Use these test keys for development:
-- `test_key_all_projects_123` - Access to all projects
-- `test_key_project_1_only_456` - Project 1 only
-- `test_key_sarah_all_789` - All projects (Sarah's key)
-- `test_key_mike_project_4_abc` - Project 4 only
-
-## Testing
-
-**Schema Validation** (no backend required):
-```bash
-npm test
-```
-
-**Full Integration** (requires Lamdera backend at localhost:8000):
-```bash
-npm run test:integration
-```
-
-## Features
-
-- **96% Test Coverage** - Comprehensive validation of all endpoints
-- **Elegant Error Handling** - Graceful degradation with detailed error messages  
-- **Timeout Management** - 15-second timeouts with retry logic
-- **Worker Attribution** - Track AI agent and human contributions
-- **Functional Design** - Pure functions with railway-oriented programming
+### Activity Tracking
+- `get_recent_activity` - Monitor project activity
 
 ## Requirements
 
-- Node.js 18+
-- Running Lamdera backend with collaborative memory RPC endpoints
-- Valid API key for backend authentication 
+- Node.js 18 or higher
+- A running Lamdera backend instance
+- Valid API key for authentication
+
+## What is Lamdera?
+
+Lamdera is a full-stack pure functional programming platform for building web applications in Elm. This MCP server connects to a Lamdera backend that implements a collaborative project management system.
+
+## License
+
+MIT
+
+## Author
+
+Klaar
+
+## Repository
+
+[https://github.com/sjalq/lamdera-collab-mcp](https://github.com/sjalq/lamdera-collab-mcp)

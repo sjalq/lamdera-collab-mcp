@@ -1,11 +1,11 @@
 {
-  "name": "lamdera-collab-mcp",
+  "name": "@sjalq/lamdera-collab-mcp",
   "version": "1.0.0",
   "description": "Minimalist MCP server for collaborative project management with Lamdera backend integration",
   "type": "module",
   "main": "server.js",
   "bin": {
-    "lamdera-collaboration-mcp": "./server.js"
+    "lamdera-collab-mcp": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
@@ -17,7 +17,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/lamdera-collab-mcp.git"
+    "url": "https://github.com/sjalq/lamdera-collab-mcp.git"
   },
   "engines": {
     "node": ">=18.0.0"
