@@ -3,10 +3,12 @@
 import { spawn } from 'child_process';
 
 class ComprehensiveTester {
-  constructor() {
+  constructor(apiUrl, apiKey, verbose = false) {
+    this.apiUrl = apiUrl;
+    this.apiKey = apiKey;
     this.passed = 0;
     this.failed = 0;
-    this.apiKey = process.argv.find(arg => arg.startsWith('--key='))?.split('=')[1] || 'test_key_all_projects_123';
+    this.verbose = verbose;
   }
 
   async runTest(name, testFn) {
@@ -17,13 +19,16 @@ class ComprehensiveTester {
       this.passed++;
     } catch (error) {
       console.log(`❌ ${name} - FAILED: ${error.message}`);
+      if (this.verbose && error.response) {
+        console.log(`📋 Response: ${JSON.stringify(error.response, null, 2)}`);
+      }
       this.failed++;
     }
   }
 
   async execMCP(args) {
     return new Promise((resolve, reject) => {
-      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', 'node', 'server.js', '--url', 'http://localhost:8000', '--key', this.apiKey, ...args], {
+      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', 'node', 'server.js', '--url', this.apiUrl, '--key', this.apiKey, ...args], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -57,7 +62,11 @@ class ComprehensiveTester {
 
   async testGetProject() {
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_project', '--tool-arg', 'project_id=1']);
-    if (!result.content?.[0]?.text?.includes('name')) throw new Error('Should return project with name');
+    if (!result.content?.[0]?.text?.includes('name')) {
+      const error = new Error('Should return project with name');
+      error.response = result;
+      throw error;
+    }
   }
 
   async testCreateProject() {
@@ -232,7 +241,10 @@ class ComprehensiveTester {
   }
 
   async runAll() {
-    console.log('🚀 Running Comprehensive MCP Tests\n');
+    console.log('🚀 Running Comprehensive MCP Tests');
+    console.log(`🎯 Testing against: ${this.apiUrl}`);
+    console.log(`🔑 Using API key: ${this.apiKey.substring(0, 8)}...${this.apiKey.substring(this.apiKey.length - 4)}`);
+    console.log('');
 
     // Happy path - all 16 tools
     await this.runTest('list_projects', () => this.testListProjects());
@@ -271,5 +283,32 @@ class ComprehensiveTester {
   }
 }
 
-const tester = new ComprehensiveTester();
-tester.runAll(); 
+// CLI argument parsing
+const args = process.argv.slice(2);
+let apiUrl = 'http://localhost:8000';
+let apiKey = 'test_key_all_projects_123';
+let verbose = false;
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--url' && i + 1 < args.length) {
+    apiUrl = args[i + 1];
+    i++;
+  } else if (args[i] === '--key' && i + 1 < args.length) {
+    apiKey = args[i + 1];
+    i++;
+  } else if (args[i] === '--verbose') {
+    verbose = true;
+  } else if (args[i] === '--help') {
+    console.log('Usage: node test-comprehensive.js [--url <api-url>] [--key <api-key>] [--verbose]');
+    console.log('');
+    console.log('Options:');
+    console.log('  --url <api-url>    API endpoint URL (default: http://localhost:8000)');
+    console.log('  --key <api-key>    API key (default: test_key_all_projects_123)');
+    console.log('  --verbose          Show detailed API responses for failures');
+    console.log('  --help             Show this help message');
+    process.exit(0);
+  }
+}
+
+const tester = new ComprehensiveTester(apiUrl, apiKey, verbose);
+tester.runAll().catch(console.error); 
