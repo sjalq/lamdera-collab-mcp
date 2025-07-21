@@ -8,7 +8,7 @@ class CollabMCP {
   constructor(apiUrl, apiKey) {
     this.apiUrl = apiUrl;
     this.apiKey = apiKey;
-            this.server = new Server({ name: 'lamdera-collab-mcp', version: '1.0.0' }, { capabilities: { tools: {} } });
+    this.server = new Server({ name: 'lamdera-collab-mcp', version: '1.0.0' }, { capabilities: { tools: {} } });
   }
 
   async callRPC(endpoint, params = {}) {
@@ -16,16 +16,30 @@ class CollabMCP {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     try {
-      const response = await fetch(`${this.apiUrl}/_r/${endpoint}/`, {
+      // Log the exact request being made
+      const url = `${this.apiUrl}/_r/${endpoint}/`;
+      const body = JSON.stringify(params);
+      
+      console.error(`[DEBUG] Calling: ${url}`);
+      console.error(`[DEBUG] Headers: x-api-key=${this.apiKey.substring(0,10)}...`);
+      console.error(`[DEBUG] Body: ${body}`);
+      
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'x-api-key': this.apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        headers: { 
+          'x-api-key': this.apiKey, 
+          'Content-Type': 'application/json',
+          'User-Agent': 'lamdera-collab-mcp/1.0.0'
+        },
+        body: body,
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
       
       const text = await response.text();
+      console.error(`[DEBUG] Response status: ${response.status}`);
+      console.error(`[DEBUG] Response text: ${text.substring(0, 200)}`);
       
       if (!response.ok) {
         let errorMsg = `${response.status}: ${response.statusText}`;
@@ -34,11 +48,17 @@ class CollabMCP {
             const errorBody = JSON.parse(text);
             errorMsg = errorBody.error || errorBody.message || errorBody.details || errorMsg;
           } catch {
-            errorMsg = text.substring(0, 200);
+            // Check if it's Cloudflare HTML
+            if (text.includes('<!DOCTYPE html>') || text.includes('Just a moment')) {
+              errorMsg = `Cloudflare protection page returned. This usually means the endpoint path is incorrect. Used: ${url}`;
+            } else {
+              errorMsg = text.substring(0, 200);
+            }
           }
         }
         throw new Error(errorMsg);
       }
+      
       if (!text.trim()) return { success: true, message: 'Operation completed' };
       
       try {
@@ -87,6 +107,9 @@ class CollabMCP {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      
+      console.error(`[DEBUG] Tool called: ${name}`);
+      console.error(`[DEBUG] Arguments: ${JSON.stringify(args)}`);
       
       try {
         let params = {};
@@ -138,8 +161,14 @@ class CollabMCP {
             params = { document_id: args.document_id };
             break;
           case 'create_document':
-            params = { title: args.title, content: args.content || '', document_type: args.type, project_id: args.project_id };
+            params = { 
+              title: args.title, 
+              content: args.content || '', 
+              document_type: args.type,  // Transform 'type' to 'document_type'
+              project_id: args.project_id 
+            };
             if (Object.keys(workerData).length > 0) params.created_by_worker = workerData;
+            console.error(`[DEBUG] Transformed params: ${JSON.stringify(params)}`);
             break;
           case 'update_document':
             params = { document_id: args.document_id, title: args.title, content: args.content, document_type: args.type };
@@ -155,28 +184,29 @@ class CollabMCP {
           case 'update_comment':
             params = { comment_id: args.comment_id, content: args.content };
             break;
-                  case 'get_recent_activity':
-          params = {};
-          break;
-        
-        case 'get_comment':
-          params = { comment_id: args.comment_id };
-          break;
-        
-        case 'delete_comment':
-          params = { comment_id: args.comment_id };
-          break;
+          case 'get_recent_activity':
+            params = {};
+            break;
+          case 'get_comment':
+            params = { comment_id: args.comment_id };
+            break;
+          case 'delete_comment':
+            params = { comment_id: args.comment_id };
+            break;
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
 
         const endpoint = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        console.error(`[DEBUG] Calling endpoint: ${endpoint}`);
+        
         const result = await this.callRPC(endpoint, params);
         
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
         };
       } catch (error) {
+        console.error(`[DEBUG] Error: ${error.message}`);
         return {
           content: [{ type: 'text', text: `Error: ${error.message}` }]
         };
@@ -188,6 +218,7 @@ class CollabMCP {
     this.setupHandlers();
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
+    console.error('[DEBUG] MCP Server started');
   }
 }
 
@@ -207,9 +238,11 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (!apiKey) {
-  console.error('Error: API key required. Use --key <api-key>');
+  console.error('[ERROR] API key is required. Use --key <api-key>');
   process.exit(1);
 }
 
-const server = new CollabMCP(apiUrl, apiKey);
-server.start().catch(console.error); 
+console.error(`[DEBUG] Starting with URL: ${apiUrl}, Key: ${apiKey.substring(0,10)}...`);
+
+const mcp = new CollabMCP(apiUrl, apiKey);
+mcp.start().catch(console.error);
