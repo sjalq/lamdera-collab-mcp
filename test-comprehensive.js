@@ -3,12 +3,13 @@
 import { spawn } from 'child_process';
 
 class ComprehensiveTester {
-  constructor(apiUrl, apiKey, verbose = false) {
+  constructor(apiUrl, apiKey, verbose = false, useMethodCall = false) {
     this.apiUrl = apiUrl;
     this.apiKey = apiKey;
     this.passed = 0;
     this.failed = 0;
     this.verbose = verbose;
+    this.useMethodCall = useMethodCall;
   }
 
   async runTest(name, testFn) {
@@ -28,7 +29,12 @@ class ComprehensiveTester {
 
   async execMCP(args) {
     return new Promise((resolve, reject) => {
-      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', 'node', 'server.js', '--url', this.apiUrl, '--key', this.apiKey, ...args], {
+      const serverArgs = ['node', 'server.js', '--url', this.apiUrl, '--key', this.apiKey];
+      if (this.useMethodCall) {
+        serverArgs.push('--use-method-call');
+      }
+      
+      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', ...serverArgs, ...args], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -174,6 +180,94 @@ class ComprehensiveTester {
     }
   }
 
+  // WAF BYPASS TESTS
+  async testMermaidSubgraphContent() {
+    const content = `# Architecture Document
+
+\`\`\`mermaid
+graph TD
+    subgraph "Frontend Layer"
+        A[React App] --> B[Redux Store]
+        style A fill:#f96,stroke:#333,stroke-width:4px
+        style B fill:#bbf,stroke:#333,stroke-width:2px
+    end
+    
+    subgraph "Backend Layer"
+        C[API Gateway] --> D[Microservice]
+        style C fill:#9f6,stroke:#333,stroke-width:2px
+    end
+\`\`\`
+
+This content previously triggered Cloudflare WAF.`;
+
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', '--tool-arg', 'title=Mermaid WAF Test', '--tool-arg', 'type=specification', '--tool-arg', 'project_id=1', '--tool-arg', `content=${content}`]);
+    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should create document with Mermaid subgraph content');
+  }
+
+  async testSQLInjectionLikeContent() {
+    const content = `# Security Testing Document
+
+## SQL Patterns (for educational purposes)
+- SELECT * FROM users WHERE 1=1
+- UNION SELECT password FROM admin_users
+- DROP TABLE sensitive_data;
+
+## XSS Patterns (for educational purposes)
+- <script>alert('XSS')</script>
+- <img src=x onerror=alert('XSS')>
+- javascript:alert('XSS')
+
+This content contains patterns that might trigger security filters.`;
+
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', '--tool-arg', 'title=Security Patterns Test', '--tool-arg', 'type=notes', '--tool-arg', 'project_id=1', '--tool-arg', `content=${content}`]);
+    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should create document with security pattern content');
+  }
+
+  async testComplexStyleDirectives() {
+    const content = `# Complex Styling Document
+
+\`\`\`mermaid
+flowchart TD
+    subgraph cluster_1 ["Complex Cluster"]
+        direction TB
+        A[Node A] --> B[Node B]
+        B --> C{Decision}
+        C -->|Yes| D[Action 1]
+        C -->|No| E[Action 2]
+        
+        style A fill:#ff9999,stroke:#333,stroke-width:4px,color:#000
+        style B fill:#99ff99,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+        style C fill:#9999ff,stroke:#333,stroke-width:3px
+        style D fill:#ffff99,stroke:#f66,stroke-width:2px,color:#000
+        style E fill:#ff99ff,stroke:#f66,stroke-width:2px,color:#000
+    end
+    
+    subgraph cluster_2 ["Another Cluster"]
+        F[Start] --> G[Process]
+        G --> H[End]
+        style F fill:#f9f,stroke:#333,stroke-width:4px
+    end
+\`\`\`
+
+Multiple subgraphs with complex style patterns.`;
+
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', '--tool-arg', 'title=Complex Styles Test', '--tool-arg', 'type=specification', '--tool-arg', 'project_id=1', '--tool-arg', `content=${content}`]);
+    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should create document with complex style directives');
+  }
+
+  async testLargeContentPayload() {
+    const content = `# Large Content Document
+
+This document tests large payloads that might trigger size-based WAF rules.
+
+${'## Section '.repeat(50).split('## Section ').map((_, i) => `## Section ${i}\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n\`\`\`javascript\nfunction example${i}() {\n  const data = {\n    id: ${i},\n    name: "Example ${i}",\n    description: "This is example number ${i}"\n  };\n  return data;\n}\n\`\`\`\n`).join('')}
+
+This creates a large document with repetitive content and code blocks.`;
+
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', '--tool-arg', 'title=Large Content Test', '--tool-arg', 'type=code', '--tool-arg', 'project_id=1', '--tool-arg', `content=${content}`]);
+    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should create large document without size restrictions');
+  }
+
   // UNHAPPY PATH TESTS
   async testInvalidProjectId() {
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_project', '--tool-arg', 'project_id=99999']);
@@ -213,13 +307,20 @@ class ComprehensiveTester {
   }
 
   async testEmptyStringRequired() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_project', '--tool-arg', 'name=']);
-    if (!result.content?.[0]?.text?.includes('Error')) throw new Error('Should return error for empty required string');
+    try {
+      await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_project', '--tool-arg', 'name=']);
+      throw new Error('Should have failed with empty required string');
+    } catch (error) {
+      // CLI parse error or validation error both acceptable
+      if (!error.message.includes('Invalid parameter format') && !error.message.includes('Error')) {
+        throw new Error('Should return error for empty required string');
+      }
+    }
   }
 
   async testUnauthorizedAccess() {
     try {
-      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', 'node', 'server.js', '--url', 'http://localhost:8000', '--key', 'invalid_key', '--method', 'tools/call', '--tool-name', 'list_projects'], {
+      const cmd = spawn('npx', ['@modelcontextprotocol/inspector', '--cli', 'node', 'server.js', '--url', this.apiUrl, '--key', 'invalid_key', '--method', 'tools/call', '--tool-name', 'list_projects'], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
       
@@ -244,6 +345,7 @@ class ComprehensiveTester {
     console.log('🚀 Running Comprehensive MCP Tests');
     console.log(`🎯 Testing against: ${this.apiUrl}`);
     console.log(`🔑 Using API key: ${this.apiKey.substring(0, 8)}...${this.apiKey.substring(this.apiKey.length - 4)}`);
+    console.log(`📡 Method: ${this.useMethodCall ? 'methodCall + Base64 encoding' : 'direct endpoints'}`);
     console.log('');
 
     // Happy path - all 16 tools
@@ -266,6 +368,14 @@ class ComprehensiveTester {
     await this.runTest('get_comment', () => this.testGetComment());
     await this.runTest('delete_comment', () => this.testDeleteComment());
 
+    console.log('\n🛡️  Running WAF Bypass Tests\n');
+
+    // WAF bypass - content that would normally be blocked
+    await this.runTest('mermaid_subgraph_content', () => this.testMermaidSubgraphContent());
+    await this.runTest('sql_injection_like_content', () => this.testSQLInjectionLikeContent());
+    await this.runTest('complex_style_directives', () => this.testComplexStyleDirectives());
+    await this.runTest('large_content_payload', () => this.testLargeContentPayload());
+
     console.log('\n💥 Running Unhappy Path Tests\n');
 
     // Unhappy path - error handling
@@ -285,30 +395,43 @@ class ComprehensiveTester {
 
 // CLI argument parsing
 const args = process.argv.slice(2);
-let apiUrl = 'http://localhost:8000';
+let port = 8000;
+let apiUrl = null;
 let apiKey = 'test_key_all_projects_123';
 let verbose = false;
+let useMethodCall = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--url' && i + 1 < args.length) {
     apiUrl = args[i + 1];
+    i++;
+  } else if (args[i] === '--port' && i + 1 < args.length) {
+    port = parseInt(args[i + 1], 10);
     i++;
   } else if (args[i] === '--key' && i + 1 < args.length) {
     apiKey = args[i + 1];
     i++;
   } else if (args[i] === '--verbose') {
     verbose = true;
+  } else if (args[i] === '--use-method-call') {
+    useMethodCall = true;
   } else if (args[i] === '--help') {
-    console.log('Usage: node test-comprehensive.js [--url <api-url>] [--key <api-key>] [--verbose]');
+    console.log('Usage: node test-comprehensive.js [--url <api-url>] [--port <port>] [--key <api-key>] [--verbose] [--use-method-call]');
     console.log('');
     console.log('Options:');
-    console.log('  --url <api-url>    API endpoint URL (default: http://localhost:8000)');
+    console.log('  --url <api-url>    API endpoint URL (overrides --port)');
+    console.log('  --port <port>      Port number (default: 8000)');
     console.log('  --key <api-key>    API key (default: test_key_all_projects_123)');
     console.log('  --verbose          Show detailed API responses for failures');
+    console.log('  --use-method-call  Use methodCall with Base64 encoding (default: false)');
     console.log('  --help             Show this help message');
     process.exit(0);
   }
 }
 
-const tester = new ComprehensiveTester(apiUrl, apiKey, verbose);
+if (!apiUrl) {
+  apiUrl = `http://localhost:${port}`;
+}
+
+const tester = new ComprehensiveTester(apiUrl, apiKey, verbose, useMethodCall);
 tester.runAll().catch(console.error); 

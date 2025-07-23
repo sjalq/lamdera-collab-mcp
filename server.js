@@ -8,9 +8,10 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 class CollabMCP {
-  constructor(apiUrl, apiKey) {
+  constructor(apiUrl, apiKey, useMethodCall = false) {
     this.apiUrl = apiUrl;
     this.apiKey = apiKey;
+    this.useMethodCall = useMethodCall;
     this.server = new Server(
       { name: "lamdera-collab-mcp", version: "1.0.0" },
       { capabilities: { tools: {} } }
@@ -21,14 +22,19 @@ class CollabMCP {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+    const actualEndpoint = this.useMethodCall ? "methodCall" : endpoint;
+    const actualBody = this.useMethodCall 
+      ? Buffer.from(JSON.stringify({ endpoint, payload: params })).toString('base64')
+      : params;
+
     try {
-      const response = await fetch(`${this.apiUrl}/_r/${endpoint}/`, {
+      const response = await fetch(`${this.apiUrl}/_r/${actualEndpoint}/`, {
         method: "POST",
         headers: {
           "x-api-key": this.apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(params),
+        body: JSON.stringify(actualBody),
         signal: controller.signal,
       });
 
@@ -490,6 +496,7 @@ class CollabMCP {
 const args = process.argv.slice(2);
 let apiUrl = "http://localhost:8000";
 let apiKey = "";
+let useMethodCall = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--url" && i + 1 < args.length) {
@@ -498,13 +505,16 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === "--key" && i + 1 < args.length) {
     apiKey = args[i + 1];
     i++;
+  } else if (args[i] === "--use-method-call") {
+    useMethodCall = true;
   }
 }
 
 if (!apiKey) {
   console.error("Error: API key required. Use --key <api-key>");
+  console.error("Usage: node server.js --key <api-key> [--url <url>] [--use-method-call]");
   process.exit(1);
 }
 
-const server = new CollabMCP(apiUrl, apiKey);
+const server = new CollabMCP(apiUrl, apiKey, useMethodCall);
 server.start().catch(console.error);

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node test-schema.js",
+    "test": "node test-comprehensive.js --key test_key_all_projects_123",
     "test:integration": "node test-comprehensive.js --key test_key_all_projects_123"
   },
   "keywords": [
@@ -30,7 +30,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "base-64": "^1.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.16.1"
