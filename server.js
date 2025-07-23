@@ -8,12 +8,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 class CollabMCP {
-  constructor(apiUrl, apiKey, useMethodCall = false) {
+  constructor(apiUrl, apiKey, useMethodCall = true) {
     this.apiUrl = apiUrl;
     this.apiKey = apiKey;
     this.useMethodCall = useMethodCall;
     this.server = new Server(
-      { name: "lamdera-collab-mcp", version: "1.0.0" },
+      { name: "lamdera-collab-mcp", version: "1.0.2" },
       { capabilities: { tools: {} } }
     );
   }
@@ -496,7 +496,7 @@ class CollabMCP {
 const args = process.argv.slice(2);
 let apiUrl = "http://localhost:8000";
 let apiKey = "";
-let useMethodCall = false;
+let useMethodCall = true;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--url" && i + 1 < args.length) {
@@ -505,14 +505,14 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === "--key" && i + 1 < args.length) {
     apiKey = args[i + 1];
     i++;
-  } else if (args[i] === "--use-method-call") {
-    useMethodCall = true;
+  } else if (args[i] === "--direct") {
+    useMethodCall = false;
   }
 }
 
 if (!apiKey) {
   console.error("Error: API key required. Use --key <api-key>");
-  console.error("Usage: node server.js --key <api-key> [--url <url>] [--use-method-call]");
+  console.error("Usage: node server.js --key <api-key> [--url <url>] [--direct]");
   process.exit(1);
 }
 

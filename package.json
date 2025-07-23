@@ -1,6 +1,6 @@
 {
   "name": "@sjalq/lamdera-collab-mcp",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Minimalist MCP server for collaborative project management with Lamdera backend integration",
   "type": "module",
   "main": "server.js",
