@@ -88,6 +88,7 @@ class CollabMCP {
             properties: {
               active_only: { type: "boolean", default: true },
               limit: { type: "number", default: 20 },
+              git_remote_url: { type: "string" },
             },
           },
         },
@@ -110,8 +111,24 @@ class CollabMCP {
               name: { type: "string" },
               description: { type: "string" },
               tags: { type: "array", items: { type: "string" } },
+              git_remote_url: { type: "string" },
               worker_type: { type: "string", enum: ["dev", "pm", "reviewer"] },
               worker_name: { type: "string" },
+            },
+          },
+        },
+        {
+          name: "update_project",
+          description: "Update project",
+          inputSchema: {
+            type: "object",
+            required: ["project_id", "name"],
+            properties: {
+              project_id: { type: "number" },
+              name: { type: "string" },
+              description: { type: "string" },
+              tags: { type: "array", items: { type: "string" } },
+              git_remote_url: { type: "string" },
             },
           },
         },
@@ -355,6 +372,9 @@ class CollabMCP {
               active_only: args.active_only ?? true,
               limit: args.limit ?? 20,
             };
+            if (args.git_remote_url) {
+              params.git_remote_url = args.git_remote_url;
+            }
             break;
           case "get_project":
             params = { project_id: args.project_id };
@@ -365,8 +385,24 @@ class CollabMCP {
               description: args.description || "",
               tags: args.tags || [],
             };
+            if (args.git_remote_url) {
+              params.git_remote_url = args.git_remote_url;
+            }
             if (Object.keys(workerData).length > 0)
               params.created_by_worker = workerData;
+            break;
+          case "update_project":
+            params = {
+              project_id: args.project_id,
+              name: args.name,
+              description: args.description || "",
+              tags: args.tags || [],
+            };
+            if (args.git_remote_url) {
+              params.git_remote_url = args.git_remote_url;
+            }
+            if (Object.keys(workerData).length > 0)
+              params.last_modified_by_worker = workerData;
             break;
           case "list_tasks":
             params = {

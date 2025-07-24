@@ -80,6 +80,21 @@ class ComprehensiveTester {
     if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should return created project with ID');
   }
 
+  async testCreateProjectWithGitRemote() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_project', '--tool-arg', 'name=Git Test Project', '--tool-arg', 'git_remote_url=https://github.com/user/repo.git', '--tool-arg', 'worker_type=dev']);
+    if (!result.content?.[0]?.text?.includes('gitRemoteUrl')) throw new Error('Should return project with git remote URL');
+  }
+
+  async testListProjectsWithGitFilter() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_projects', '--tool-arg', 'git_remote_url=https://github.com/user/repo.git']);
+    if (!result.content?.[0]?.text?.includes('projects')) throw new Error('Should return filtered projects');
+  }
+
+  async testUpdateProject() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_project', '--tool-arg', 'project_id=1', '--tool-arg', 'name=Updated Project', '--tool-arg', 'git_remote_url=https://github.com/user/updated.git']);
+    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should return updated project');
+  }
+
   async testListTasks() {
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_tasks', '--tool-arg', 'project_id=1']);
     if (!result.content?.[0]?.text?.includes('data')) throw new Error('Should return tasks data');
@@ -177,6 +192,93 @@ class ComprehensiveTester {
     const text = result.content?.[0]?.text || '';
     if (!text.includes('deleted') && !text.includes('Error') && !text.includes('403')) {
       throw new Error('Should return deletion confirmation or proper error');
+    }
+  }
+
+  // SAFE UPDATE TESTS
+  async testSafeUpdateTask() {
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Safe Update MCP Task', 
+      '--tool-arg', 'description=Original description', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=todo', '--tool-arg', 'priority=low']);
+    
+    const createText = createResult.content?.[0]?.text || '';
+    const createData = JSON.parse(createText);
+    const taskId = createData.id;
+    
+    const partialResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_task', 
+      '--tool-arg', `task_id=${taskId}`, '--tool-arg', 'status=in_progress']);
+    const partialText = partialResult.content?.[0]?.text || '';
+    const partialData = JSON.parse(partialText);
+    if (partialData.title !== 'Safe Update MCP Task' || partialData.status !== 'in_progress') {
+      throw new Error('Partial update should preserve other fields');
+    }
+    
+    const emptyResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_task', 
+      '--tool-arg', `task_id=${taskId}`, '--tool-arg', 'title= ', '--tool-arg', 'priority=high']);
+    const emptyText = emptyResult.content?.[0]?.text || '';
+    const emptyData = JSON.parse(emptyText);
+    if (emptyData.title !== 'Safe Update MCP Task' || emptyData.priority !== 'high') {
+      throw new Error('Empty/whitespace strings should be ignored, other updates applied');
+    }
+    
+    const whitespaceResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_task', 
+      '--tool-arg', `task_id=${taskId}`, '--tool-arg', 'description=   ', '--tool-arg', 'status=review']);
+    const whitespaceText = whitespaceResult.content?.[0]?.text || '';
+    const whitespaceData = JSON.parse(whitespaceText);
+    if (whitespaceData.description !== 'Original description' || whitespaceData.status !== 'review') {
+      throw new Error('Whitespace strings should be ignored');
+    }
+  }
+
+  async testSafeUpdateDocument() {
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', 
+      '--tool-arg', 'title=Safe Update MCP Doc', '--tool-arg', 'content=Original content',
+      '--tool-arg', 'type=notes', '--tool-arg', 'project_id=1']);
+    
+    const createText = createResult.content?.[0]?.text || '';
+    const createData = JSON.parse(createText);
+    const docId = createData.id;
+    
+    const partialResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_document', 
+      '--tool-arg', `document_id=${docId}`, '--tool-arg', 'title=Updated Title Only']);
+    const partialText = partialResult.content?.[0]?.text || '';
+    const partialData = JSON.parse(partialText);
+    if (partialData.title !== 'Updated Title Only' || partialData.content !== 'Original content') {
+      throw new Error('Document partial update should preserve content');
+    }
+    
+    const emptyResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_document', 
+      '--tool-arg', `document_id=${docId}`, '--tool-arg', 'content= ', '--tool-arg', 'title=Final Title']);
+    const emptyText = emptyResult.content?.[0]?.text || '';
+    const emptyData = JSON.parse(emptyText);
+    if (emptyData.content !== 'Original content' || emptyData.title !== 'Final Title') {
+      throw new Error('Document empty/whitespace content should be ignored');
+    }
+  }
+
+  async testSafeUpdateComment() {
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_comment', 
+      '--tool-arg', 'task_id=1', '--tool-arg', 'content=Original MCP comment content']);
+    
+    const createText = createResult.content?.[0]?.text || '';
+    const createData = JSON.parse(createText);
+    const commentId = createData.id;
+    
+    const emptyResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_comment', 
+      '--tool-arg', `comment_id=${commentId}`, '--tool-arg', 'content= ']);
+    const emptyText = emptyResult.content?.[0]?.text || '';
+    const emptyData = JSON.parse(emptyText);
+    if (emptyData.content !== 'Original MCP comment content') {
+      throw new Error('Comment empty/whitespace content should be ignored');
+    }
+    
+    const whitespaceResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_comment', 
+      '--tool-arg', `comment_id=${commentId}`, '--tool-arg', 'content=   \t\n   ']);
+    const whitespaceText = whitespaceResult.content?.[0]?.text || '';
+    const whitespaceData = JSON.parse(whitespaceText);
+    if (whitespaceData.content !== 'Original MCP comment content') {
+      throw new Error('Comment whitespace content should be ignored');
     }
   }
 
@@ -352,6 +454,9 @@ This creates a large document with repetitive content and code blocks.`;
     await this.runTest('list_projects', () => this.testListProjects());
     await this.runTest('get_project', () => this.testGetProject());
     await this.runTest('create_project', () => this.testCreateProject());
+    await this.runTest('create_project_with_git_remote', () => this.testCreateProjectWithGitRemote());
+    await this.runTest('list_projects_with_git_filter', () => this.testListProjectsWithGitFilter());
+    await this.runTest('update_project', () => this.testUpdateProject());
     await this.runTest('list_tasks', () => this.testListTasks());
     await this.runTest('list_epics', () => this.testListEpics());
     await this.runTest('get_task', () => this.testGetTask());
@@ -367,6 +472,13 @@ This creates a large document with repetitive content and code blocks.`;
     await this.runTest('get_recent_activity', () => this.testGetRecentActivity());
     await this.runTest('get_comment', () => this.testGetComment());
     await this.runTest('delete_comment', () => this.testDeleteComment());
+
+    console.log('\n🔒 Running Safe Update Tests\n');
+
+    // Safe update tests - partial updates, empty strings, whitespace handling
+    await this.runTest('safe_update_task', () => this.testSafeUpdateTask());
+    await this.runTest('safe_update_document', () => this.testSafeUpdateDocument());
+    await this.runTest('safe_update_comment', () => this.testSafeUpdateComment());
 
     console.log('\n🛡️  Running WAF Bypass Tests\n');
 
