@@ -13,7 +13,7 @@ class CollabMCP {
     this.apiKey = apiKey;
     this.useMethodCall = useMethodCall;
     this.server = new Server(
-      { name: "lamdera-collab-mcp", version: "1.0.2" },
+      { name: "lamdera-collab-mcp", version: "1.0.3" },
       { capabilities: { tools: {} } }
     );
   }
@@ -499,7 +499,10 @@ let apiKey = "";
 let useMethodCall = true;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--url" && i + 1 < args.length) {
+  if (args[i] === "--version" || args[i] === "-v") {
+    console.log("1.0.3");
+    process.exit(0);
+  } else if (args[i] === "--url" && i + 1 < args.length) {
     apiUrl = args[i + 1];
     i++;
   } else if (args[i] === "--key" && i + 1 < args.length) {
@@ -512,7 +515,7 @@ for (let i = 0; i < args.length; i++) {
 
 if (!apiKey) {
   console.error("Error: API key required. Use --key <api-key>");
-  console.error("Usage: node server.js --key <api-key> [--url <url>] [--direct]");
+  console.error("Usage: node server.js --key <api-key> [--url <url>] [--direct] [--version]");
   process.exit(1);
 }
 
