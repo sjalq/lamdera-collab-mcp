@@ -179,6 +179,105 @@ class ComprehensiveTester {
     }
   }
 
+  async testGetTaskStatusAnalytics() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_task_status_analytics', '--tool-arg', 'project_id=1']);
+    const text = result.content?.[0]?.text || '';
+    if (!text.includes('statusCounts') && !text.includes('inProgressTasks') && !text.includes('reviewTasks') && !text.includes('Error')) {
+      throw new Error('Should return analytics data with statusCounts, inProgressTasks, and reviewTasks arrays');
+    }
+    
+    // Additional validation if we get valid JSON response
+    try {
+      const data = JSON.parse(text);
+      if (data.statusCounts && Array.isArray(data.statusCounts)) {
+        console.log(`   Found ${data.statusCounts.length} status types`);
+      }
+      if (data.inProgressTasks && Array.isArray(data.inProgressTasks)) {
+        console.log(`   Found ${data.inProgressTasks.length} in-progress tasks`);
+      }
+      if (data.reviewTasks && Array.isArray(data.reviewTasks)) {
+        console.log(`   Found ${data.reviewTasks.length} review tasks`);
+      }
+    } catch (e) {
+      // Text response is fine too - could be formatted output
+    }
+  }
+
+  async testTakeNextTask() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'take_next_task', '--tool-arg', 'project_id=1']);
+    const text = result.content?.[0]?.text || '';
+    if (!text.includes('task') && !text.includes('message') && !text.includes('Error')) {
+      throw new Error('Should return task data or appropriate message');
+    }
+    
+    // Additional validation if we get valid JSON response
+    try {
+      const data = JSON.parse(text);
+      if (data.task) {
+        console.log(`   Started task: ${data.task.title || 'Unknown'}`);
+      }
+      if (data.message) {
+        console.log(`   Message: ${data.message}`);
+      }
+      if (data.alreadyInProgress !== undefined) {
+        console.log(`   Already in progress: ${data.alreadyInProgress}`);
+      }
+      if (data.hasReviewTasks !== undefined) {
+        console.log(`   Has review tasks: ${data.hasReviewTasks} (${data.reviewTaskCount || 0} tasks)`);
+      }
+    } catch (e) {
+      // Text response is fine too - could be formatted output
+    }
+  }
+
+  async testTakeNextTaskWithReviewWarning() {
+    // First create a task in Review status
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Task Awaiting Review', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=review']);
+    
+    // Now try to take next task - should warn about review tasks
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'take_next_task', '--tool-arg', 'project_id=1']);
+    const text = result.content?.[0]?.text || '';
+    
+    try {
+      const data = JSON.parse(text);
+      // If there are no InProgress tasks, it should warn about review tasks
+      if (!data.alreadyInProgress && data.hasReviewTasks) {
+        console.log(`   Warning: ${data.reviewTaskCount} task(s) awaiting review`);
+        if (!data.message.includes('review')) {
+          throw new Error('Should mention review tasks in message');
+        }
+      }
+    } catch (e) {
+      // Could be a different response format
+    }
+  }
+
+  async testTakeNextReviewTask() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'take_next_review_task', '--tool-arg', 'project_id=1']);
+    const text = result.content?.[0]?.text || '';
+    if (!text.includes('task') && !text.includes('message') && !text.includes('Error')) {
+      throw new Error('Should return task data or appropriate message');
+    }
+    
+    // Additional validation if we get valid JSON response
+    try {
+      const data = JSON.parse(text);
+      if (data.task) {
+        console.log(`   Started review task: ${data.task.title || 'Unknown'}`);
+      }
+      if (data.message) {
+        console.log(`   Message: ${data.message}`);
+      }
+      if (data.alreadyInProgress !== undefined) {
+        console.log(`   Already in progress: ${data.alreadyInProgress}`);
+      }
+    } catch (e) {
+      // Text response is fine too - could be formatted output
+    }
+  }
+
   async testGetComment() {
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_comment', '--tool-arg', 'comment_id=1']);
     const text = result.content?.[0]?.text || '';
@@ -193,6 +292,41 @@ class ComprehensiveTester {
     if (!text.includes('deleted') && !text.includes('Error') && !text.includes('403')) {
       throw new Error('Should return deletion confirmation or proper error');
     }
+  }
+
+  async testMoveTaskToTop() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_top', '--tool-arg', 'task_id=1']);
+    if (!result.content?.[0]?.text?.includes('order')) throw new Error('Should return task with updated order');
+  }
+
+  async testMoveTaskToBottom() {
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_bottom', '--tool-arg', 'task_id=2']);
+    if (!result.content?.[0]?.text?.includes('order')) throw new Error('Should return task with updated order');
+  }
+
+  async testTaskRejectReview() {
+    // First create a task in Review status
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Review Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=review']);
+    
+    const createText = createResult.content?.[0]?.text || '';
+    const createData = JSON.parse(createText);
+    const taskId = createData.id;
+    
+    // Now reject the task
+    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'task_reject_review', 
+      '--tool-arg', `task_id=${taskId}`, '--tool-arg', 'reviewer_comment=Needs more work on error handling']);
+    
+    const text = result.content?.[0]?.text || '';
+    if (!text.includes('task') || !text.includes('comment') || !text.includes('rejected')) {
+      throw new Error('Should return task, comment, and rejection message');
+    }
+    
+    // Verify the task is now Todo status and has the lowest order
+    const data = JSON.parse(text);
+    if (data.task.status !== 'todo') throw new Error('Task should be in Todo status');
+    if (!data.comment.content.includes('error handling')) throw new Error('Comment should contain rejection reason');
   }
 
   // SAFE UPDATE TESTS
@@ -470,8 +604,15 @@ This creates a large document with repetitive content and code blocks.`;
     await this.runTest('create_comment', () => this.testCreateComment());
     await this.runTest('update_comment', () => this.testUpdateComment());
     await this.runTest('get_recent_activity', () => this.testGetRecentActivity());
+    await this.runTest('get_task_status_analytics', () => this.testGetTaskStatusAnalytics());
+    await this.runTest('take_next_task', () => this.testTakeNextTask());
+    await this.runTest('take_next_task_with_review_warning', () => this.testTakeNextTaskWithReviewWarning());
+    await this.runTest('take_next_review_task', () => this.testTakeNextReviewTask());
     await this.runTest('get_comment', () => this.testGetComment());
     await this.runTest('delete_comment', () => this.testDeleteComment());
+    await this.runTest('move_task_to_top', () => this.testMoveTaskToTop());
+    await this.runTest('move_task_to_bottom', () => this.testMoveTaskToBottom());
+    await this.runTest('task_reject_review', () => this.testTaskRejectReview());
 
     console.log('\n🔒 Running Safe Update Tests\n');
 

@@ -82,13 +82,16 @@ class CollabMCP {
         // Projects
         {
           name: "list_projects",
-          description: "List projects",
+          description: "List projects. To find the project for the current git repository, first run 'git remote get-url origin' locally to get the remote URL, then use the git_remote_url parameter to filter projects by that URL.",
           inputSchema: {
             type: "object",
             properties: {
               active_only: { type: "boolean", default: true },
               limit: { type: "number", default: 20 },
-              git_remote_url: { type: "string" },
+              git_remote_url: { 
+                type: "string",
+                description: "Filter projects by git remote URL. Use 'git remote get-url origin' to get the current repo's remote URL." 
+              },
             },
           },
         },
@@ -103,7 +106,7 @@ class CollabMCP {
         },
         {
           name: "create_project",
-          description: "Create project",
+          description: "Create project. Use git_remote_url to associate the project with a git repository.",
           inputSchema: {
             type: "object",
             required: ["name"],
@@ -111,9 +114,26 @@ class CollabMCP {
               name: { type: "string" },
               description: { type: "string" },
               tags: { type: "array", items: { type: "string" } },
-              git_remote_url: { type: "string" },
+              git_remote_url: { 
+                type: "string",
+                description: "Git remote URL to associate with this project. Use 'git remote get-url origin' to get current repo's URL."
+              },
               worker_type: { type: "string", enum: ["dev", "pm", "reviewer"] },
               worker_name: { type: "string" },
+            },
+          },
+        },
+        {
+          name: "get_project_by_git_remote",
+          description: "Find a project by its git remote URL. First run 'git remote get-url origin' locally to get the remote URL of your current repository, then use this tool to find the associated project.",
+          inputSchema: {
+            type: "object",
+            required: ["git_remote_url"],
+            properties: {
+              git_remote_url: { 
+                type: "string",
+                description: "The git remote URL to search for. Get this by running 'git remote get-url origin' in your repository."
+              },
             },
           },
         },
@@ -136,24 +156,13 @@ class CollabMCP {
         // Tasks
         {
           name: "list_tasks",
-          description: "List tasks",
+          description: "List tasks in a project. Tasks are returned sorted by their order (priority). Lower order numbers = higher priority. Use take_next_task to automatically pick and start working on the highest priority Todo task.",
           inputSchema: {
             type: "object",
             properties: {
               project_id: { type: "number" },
               status: { type: "array", items: { type: "string" } },
               limit: { type: "number", default: 50 },
-            },
-          },
-        },
-        {
-          name: "list_epics",
-          description: "List epics",
-          inputSchema: {
-            type: "object",
-            properties: {
-              project_id: { type: "number" },
-              limit: { type: "number", default: 20 },
             },
           },
         },
@@ -297,29 +306,27 @@ class CollabMCP {
           },
         },
         {
-          name: "create_comment",
-          description: "Create comment",
+          name: "upsert_comment",
+          description: "Create a new comment or update an existing one. If comment_id is provided, updates the existing comment. Otherwise creates a new comment on the specified task.",
           inputSchema: {
             type: "object",
-            required: ["task_id", "content"],
+            required: ["content"],
             properties: {
-              task_id: { type: "number" },
+              comment_id: { 
+                type: "number",
+                description: "Optional - provide to update an existing comment" 
+              },
+              task_id: { 
+                type: "number",
+                description: "Required when creating a new comment (not needed for updates)" 
+              },
               content: { type: "string" },
-              parent_comment_id: { type: "number" },
+              parent_comment_id: { 
+                type: "number",
+                description: "Optional - for threaded comments (only for new comments)" 
+              },
               worker_type: { type: "string", enum: ["dev", "pm", "reviewer"] },
               worker_name: { type: "string" },
-            },
-          },
-        },
-        {
-          name: "update_comment",
-          description: "Update comment",
-          inputSchema: {
-            type: "object",
-            required: ["comment_id", "content"],
-            properties: {
-              comment_id: { type: "number" },
-              content: { type: "string" },
             },
           },
         },
@@ -331,21 +338,76 @@ class CollabMCP {
           inputSchema: { type: "object", properties: {} },
         },
         {
-          name: "get_comment",
-          description: "Get comment by ID",
-          inputSchema: {
-            type: "object",
-            required: ["comment_id"],
-            properties: { comment_id: { type: "number" } },
+          name: "get_task_status_analytics",
+          description: "Get task status analytics including counts per status and timing data for InProgress and Review tasks",
+          inputSchema: { 
+            type: "object", 
+            properties: {
+              project_id: { type: "number" }
+            }
           },
         },
         {
-          name: "delete_comment",
-          description: "Delete comment",
+          name: "take_next_task",
+          description: "Get the next task to work on: Automatically selects the highest priority (lowest order number) Todo task in the project and marks it as InProgress. This is the primary way to pick which task to work on next. Returns the task with all its comments. Only one task can be InProgress per project (use force=true to override).",
           inputSchema: {
             type: "object",
-            required: ["comment_id"],
-            properties: { comment_id: { type: "number" } },
+            required: ["project_id"],
+            properties: {
+              project_id: { type: "number" },
+              force: { type: "boolean", default: false }
+            }
+          },
+        },
+        {
+          name: "take_next_review_task",
+          description: "Get the next task to review: Automatically selects the highest priority (lowest order number) task that's in Review status and marks it as InProgress for you to work on. Use this when you want to review tasks rather than work on new ones. Returns the task with all its comments. Only one task can be InProgress per project (use force=true to override).",
+          inputSchema: {
+            type: "object",
+            required: ["project_id"],
+            properties: {
+              project_id: { type: "number" },
+              force: { type: "boolean", default: false }
+            }
+          },
+        },
+        
+        // Task ordering
+        {
+          name: "move_task_to_top_or_bottom",
+          description: "Move a task to the top or bottom of the order within its project",
+          inputSchema: {
+            type: "object",
+            required: ["task_id", "position"],
+            properties: { 
+              task_id: { 
+                type: "number",
+                description: "The ID of the task to move"
+              },
+              position: {
+                type: "string",
+                enum: ["top", "bottom"],
+                description: "Where to move the task - 'top' for highest priority or 'bottom' for lowest priority"
+              }
+            },
+          },
+        },
+        {
+          name: "task_reject_review",
+          description: "Reject a task that's in Review status back to Todo with a comment explaining why. The task will be moved to the front of the Todo queue (highest priority). This creates a comment with the rejection reason for tracking purposes.",
+          inputSchema: {
+            type: "object",
+            required: ["task_id", "reviewer_comment"],
+            properties: { 
+              task_id: { 
+                type: "number",
+                description: "The ID of the task to reject from review"
+              },
+              reviewer_comment: {
+                type: "string",
+                description: "The reason for rejecting the task - will be added as a comment"
+              }
+            },
           },
         },
       ],
@@ -411,9 +473,6 @@ class CollabMCP {
               limit: args.limit ?? 50,
             };
             break;
-          case "list_epics":
-            params = { project_id: args.project_id, limit: args.limit ?? 20 };
-            break;
           case "get_task":
             params = { task_id: args.task_id };
             break;
@@ -478,36 +537,95 @@ class CollabMCP {
               page: args.page ?? 1,
             };
             break;
-          case "create_comment":
-            params = {
-              task_id: args.task_id,
-              content: args.content,
-              parent_comment_id: args.parent_comment_id,
-            };
-            if (Object.keys(workerData).length > 0)
-              params.created_by_worker = workerData;
-            break;
-          case "update_comment":
-            params = { comment_id: args.comment_id, content: args.content };
+          case "upsert_comment":
+            if (args.comment_id) {
+              // Update existing comment
+              params = { comment_id: args.comment_id, content: args.content };
+            } else {
+              // Create new comment
+              params = {
+                task_id: args.task_id,
+                content: args.content,
+                parent_comment_id: args.parent_comment_id,
+              };
+              if (Object.keys(workerData).length > 0)
+                params.created_by_worker = workerData;
+            }
             break;
           case "get_recent_activity":
             params = {};
             break;
-
-          case "get_comment":
-            params = { comment_id: args.comment_id };
+          case "get_task_status_analytics":
+            params = { project_id: args.project_id };
             break;
 
-          case "delete_comment":
-            params = { comment_id: args.comment_id };
+          case "take_next_task":
+            params = { project_id: args.project_id, force: args.force ?? false };
             break;
+
+          case "take_next_review_task":
+            params = { project_id: args.project_id, force: args.force ?? false };
+            break;
+
+            
+          case "get_project_by_git_remote":
+            // This will use list_projects internally with git_remote_url filter
+            break;
+            
+          case "move_task_to_top_or_bottom":
+            params = { task_id: args.task_id };
+            break;
+            
+          case "task_reject_review":
+            params = { 
+              task_id: args.task_id,
+              reviewer_comment: args.reviewer_comment 
+            };
+            break;
+            
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
 
-        const endpoint = name.replace(/_([a-z])/g, (_, letter) =>
+        // Special handling for get_project_by_git_remote
+        if (name === "get_project_by_git_remote") {
+          const projects = await this.callRPC("listProjects", {
+            git_remote_url: args.git_remote_url,
+            active_only: true
+          });
+          
+          if (projects.data && projects.data.length === 1) {
+            return {
+              content: [{ type: "text", text: JSON.stringify(projects.data[0], null, 2) }],
+            };
+          } else if (projects.data && projects.data.length > 1) {
+            return {
+              content: [{ 
+                type: "text", 
+                text: `Error: Multiple projects found with git remote URL ${args.git_remote_url}. Found ${projects.data.length} projects.`
+              }],
+            };
+          } else {
+            return {
+              content: [{ 
+                type: "text", 
+                text: `Error: No project found with git remote URL ${args.git_remote_url}`
+              }],
+            };
+          }
+        }
+
+        let endpoint = name.replace(/_([a-z])/g, (_, letter) =>
           letter.toUpperCase()
         );
+        
+        // Special handling for merged tools
+        if (name === "move_task_to_top_or_bottom") {
+          endpoint = args.position === "top" ? "moveTaskToTop" : "moveTaskToBottom";
+        } else if (name === "upsert_comment") {
+          endpoint = args.comment_id ? "updateComment" : "createComment";
+        }
+        
         const result = await this.callRPC(endpoint, params);
 
         return {
