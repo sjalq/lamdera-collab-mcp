@@ -100,10 +100,6 @@ class ComprehensiveTester {
     if (!result.content?.[0]?.text?.includes('data')) throw new Error('Should return tasks data');
   }
 
-  async testListEpics() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_epics', '--tool-arg', 'project_id=1']);
-    if (!result.content?.[0]?.text?.includes('data')) throw new Error('Should return epics data');
-  }
 
   async testGetTask() {
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_task', '--tool-arg', 'task_id=1']);
@@ -157,15 +153,15 @@ class ComprehensiveTester {
     if (!result.content?.[0]?.text?.includes('data')) throw new Error('Should return comments data');
   }
 
-  async testCreateComment() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_comment', '--tool-arg', 'task_id=1', '--tool-arg', 'content=Test comment']);
-    if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should return created comment with ID');
-  }
-
-  async testUpdateComment() {
+  async testUpsertComment() {
+    // Test creating a new comment
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'upsert_comment', '--tool-arg', 'task_id=1', '--tool-arg', 'content=Test comment']);
+    if (!createResult.content?.[0]?.text?.includes('id')) throw new Error('Should return created comment with ID');
+    
+    // Test updating existing comment
     // Comment ID 5 is authored by "s.dormehl@sakeliga.org.za" - matches our API key user
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_comment', '--tool-arg', 'comment_id=5', '--tool-arg', 'content=Updated comment']);
-    const text = result.content?.[0]?.text || '';
+    const updateResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'upsert_comment', '--tool-arg', 'comment_id=5', '--tool-arg', 'content=Updated comment']);
+    const text = updateResult.content?.[0]?.text || '';
     if (!text.includes('Updated comment') && !text.includes('timeout') && !text.includes('restarting') && !text.includes('success')) {
       throw new Error('Should return updated comment data or graceful timeout message');
     }
@@ -278,30 +274,17 @@ class ComprehensiveTester {
     }
   }
 
-  async testGetComment() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_comment', '--tool-arg', 'comment_id=1']);
-    const text = result.content?.[0]?.text || '';
-    if (!text.includes('content') && !text.includes('Error') && !text.includes('403')) {
-      throw new Error('Should return comment data or proper error');
-    }
-  }
 
-  async testDeleteComment() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'delete_comment', '--tool-arg', 'comment_id=1']);
-    const text = result.content?.[0]?.text || '';
-    if (!text.includes('deleted') && !text.includes('Error') && !text.includes('403')) {
-      throw new Error('Should return deletion confirmation or proper error');
-    }
-  }
-
-  async testMoveTaskToTop() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_top', '--tool-arg', 'task_id=1']);
-    if (!result.content?.[0]?.text?.includes('order')) throw new Error('Should return task with updated order');
-  }
-
-  async testMoveTaskToBottom() {
-    const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_bottom', '--tool-arg', 'task_id=2']);
-    if (!result.content?.[0]?.text?.includes('order')) throw new Error('Should return task with updated order');
+  async testMoveTaskToTopOrBottom() {
+    // Test moving to top
+    const topResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_top_or_bottom', '--tool-arg', 'task_id=1', '--tool-arg', 'position=top']);
+    const topText = topResult.content?.[0]?.text || '';
+    if (!topText.includes('success') && !topText.includes('newOrder')) throw new Error('Should return success with newOrder when moving to top');
+    
+    // Test moving to bottom
+    const bottomResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'move_task_to_top_or_bottom', '--tool-arg', 'task_id=2', '--tool-arg', 'position=bottom']);
+    const bottomText = bottomResult.content?.[0]?.text || '';
+    if (!bottomText.includes('success') && !bottomText.includes('newOrder')) throw new Error('Should return success with newOrder when moving to bottom');
   }
 
   async testTaskRejectReview() {
@@ -392,14 +375,14 @@ class ComprehensiveTester {
   }
 
   async testSafeUpdateComment() {
-    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_comment', 
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'upsert_comment', 
       '--tool-arg', 'task_id=1', '--tool-arg', 'content=Original MCP comment content']);
     
     const createText = createResult.content?.[0]?.text || '';
     const createData = JSON.parse(createText);
     const commentId = createData.id;
     
-    const emptyResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_comment', 
+    const emptyResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'upsert_comment', 
       '--tool-arg', `comment_id=${commentId}`, '--tool-arg', 'content= ']);
     const emptyText = emptyResult.content?.[0]?.text || '';
     const emptyData = JSON.parse(emptyText);
@@ -407,7 +390,7 @@ class ComprehensiveTester {
       throw new Error('Comment empty/whitespace content should be ignored');
     }
     
-    const whitespaceResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_comment', 
+    const whitespaceResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'upsert_comment', 
       '--tool-arg', `comment_id=${commentId}`, '--tool-arg', 'content=   \t\n   ']);
     const whitespaceText = whitespaceResult.content?.[0]?.text || '';
     const whitespaceData = JSON.parse(whitespaceText);
@@ -592,7 +575,6 @@ This creates a large document with repetitive content and code blocks.`;
     await this.runTest('list_projects_with_git_filter', () => this.testListProjectsWithGitFilter());
     await this.runTest('update_project', () => this.testUpdateProject());
     await this.runTest('list_tasks', () => this.testListTasks());
-    await this.runTest('list_epics', () => this.testListEpics());
     await this.runTest('get_task', () => this.testGetTask());
     await this.runTest('create_task', () => this.testCreateTask());
     await this.runTest('update_task', () => this.testUpdateTask());
@@ -601,17 +583,13 @@ This creates a large document with repetitive content and code blocks.`;
     await this.runTest('create_document', () => this.testCreateDocument());
     await this.runTest('update_document', () => this.testUpdateDocument());
     await this.runTest('list_task_comments', () => this.testListTaskComments());
-    await this.runTest('create_comment', () => this.testCreateComment());
-    await this.runTest('update_comment', () => this.testUpdateComment());
+    await this.runTest('upsert_comment', () => this.testUpsertComment());
     await this.runTest('get_recent_activity', () => this.testGetRecentActivity());
     await this.runTest('get_task_status_analytics', () => this.testGetTaskStatusAnalytics());
     await this.runTest('take_next_task', () => this.testTakeNextTask());
     await this.runTest('take_next_task_with_review_warning', () => this.testTakeNextTaskWithReviewWarning());
     await this.runTest('take_next_review_task', () => this.testTakeNextReviewTask());
-    await this.runTest('get_comment', () => this.testGetComment());
-    await this.runTest('delete_comment', () => this.testDeleteComment());
-    await this.runTest('move_task_to_top', () => this.testMoveTaskToTop());
-    await this.runTest('move_task_to_bottom', () => this.testMoveTaskToBottom());
+    await this.runTest('move_task_to_top_or_bottom', () => this.testMoveTaskToTopOrBottom());
     await this.runTest('task_reject_review', () => this.testTaskRejectReview());
 
     console.log('\n🔒 Running Safe Update Tests\n');

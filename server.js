@@ -615,15 +615,16 @@ class CollabMCP {
           }
         }
 
-        let endpoint = name.replace(/_([a-z])/g, (_, letter) =>
-          letter.toUpperCase()
-        );
-        
         // Special handling for merged tools
+        let endpoint;
         if (name === "move_task_to_top_or_bottom") {
           endpoint = args.position === "top" ? "moveTaskToTop" : "moveTaskToBottom";
         } else if (name === "upsert_comment") {
           endpoint = args.comment_id ? "updateComment" : "createComment";
+        } else {
+          endpoint = name.replace(/_([a-z])/g, (_, letter) =>
+            letter.toUpperCase()
+          );
         }
         
         const result = await this.callRPC(endpoint, params);
