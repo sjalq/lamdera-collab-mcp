@@ -37,35 +37,50 @@ Add this to your MCP client configuration (e.g., Claude Desktop):
 
 ## Available Tools
 
-This MCP server provides 18 tools organized into 5 categories:
+This MCP server provides 21 tools organized into 6 categories:
 
 ### Project Management
-- `list_projects` - View all accessible projects
-- `get_project` - Get detailed project information
-- `create_project` - Create new projects with tags
+- `list_projects` - View all accessible projects with filtering options
+- `get_project` - Get detailed project information by ID
+- `get_project_by_git_remote` - Find project by git remote URL
+- `create_project` - Create new projects with tags and git integration
+- `update_project` - Update project details and metadata
 
 ### Task Management  
 - `list_tasks` - List and filter tasks by status, assignee, or project
-- `list_epics` - View high-level epics for planning
-- `get_task` - Get detailed task information
-- `create_task` - Create tasks (epics, stories, tasks, bugs)
-- `update_task` - Update task details and status
+- `get_task` - Get detailed task information with comments
+- `create_task` - Create tasks (epics, stories, tasks, bugs, components)
+- `update_task` - Update task details, status, and priority
 
-### Documentation
-- `search_documents` - Search project documentation
-- `get_document` - Retrieve specific documents
-- `create_document` - Create technical docs, specs, or notes
-- `update_document` - Update existing documentation
+### Task Workflow & Automation
+- `take_next_task` - Automatically pick the next highest priority todo task
+- `take_next_review_task` - Pick the next task in review status
+- `move_task_to_top_or_bottom` - Reorder tasks for priority management
+- `task_reject_review` - Reject review tasks back to todo with feedback
+- `get_task_status_analytics` - Get task status distribution and metrics
 
-### Collaboration
-- `list_task_comments` - View task discussions
-- `create_comment` - Add comments to tasks
-- `update_comment` - Edit your comments
-- `get_comment` - Get comment details
-- `delete_comment` - Remove comments
+### Documentation Management
+- `search_documents` - Search project documentation with text queries
+- `get_document` - Retrieve specific documents by ID
+- `create_document` - Create technical docs, specifications, or notes
+- `update_document` - Update existing documentation content
 
-### Activity Tracking
-- `get_recent_activity` - Monitor project activity
+### Collaboration & Communication
+- `list_task_comments` - View hierarchical task discussions
+- `upsert_comment` - Create or update comments on tasks and documents
+
+### Activity & Monitoring
+- `get_recent_activity` - Monitor project activity and changes
+
+## Key Features
+
+- **Project Discovery**: Find projects by git remote URL for seamless integration
+- **Automated Workflows**: Take next tasks automatically with priority ordering
+- **Task Prioritization**: Move tasks to top/bottom with normalized ordering
+- **Review Management**: Streamlined task review and rejection workflows
+- **Rich Documentation**: Full text search and document management
+- **Activity Tracking**: Monitor project progress and team activity
+- **Hierarchical Comments**: Threaded discussions on tasks and documents
 
 ## Requirements
 

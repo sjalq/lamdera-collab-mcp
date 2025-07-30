@@ -13,7 +13,7 @@ class CollabMCP {
     this.apiKey = apiKey;
     this.useMethodCall = useMethodCall;
     this.server = new Server(
-      { name: "lamdera-collab-mcp", version: "1.0.3" },
+      { name: "lamdera-collab-mcp", version: "1.1.0" },
       { capabilities: { tools: {} } }
     );
   }
