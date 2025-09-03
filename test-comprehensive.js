@@ -288,10 +288,10 @@ class ComprehensiveTester {
   }
 
   async testTaskRejectReview() {
-    // First create a task in Review status
+    // First create a task in UnderReview status
     const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
-      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Review Task', '--tool-arg', 'task_type=task',
-      '--tool-arg', 'status=review']);
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=UnderReview Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=under_review']);
     
     const createText = createResult.content?.[0]?.text || '';
     const createData = JSON.parse(createText);
@@ -367,7 +367,7 @@ class ComprehensiveTester {
     const fetchResult3 = await this.execMCP(['--method', 'tools/call', '--tool-name', 'get_task', '--tool-arg', `task_id=${taskId}`]);
     const fetchText3 = fetchResult3.content?.[0]?.text || '';
     const fetchData3 = JSON.parse(fetchText3);
-    if (fetchData3.description !== 'Original description' || fetchData3.status !== 'review') {
+    if (fetchData3.description !== 'Original description' || fetchData3.status !== 'ready_for_review') {
       throw new Error('Whitespace strings should be ignored');
     }
   }
@@ -445,6 +445,80 @@ This content previously triggered Cloudflare WAF.`;
 
     const result = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_document', '--tool-arg', 'title=Mermaid WAF Test', '--tool-arg', 'type=specification', '--tool-arg', 'project_id=1', '--tool-arg', `content=${content}`]);
     if (!result.content?.[0]?.text?.includes('id')) throw new Error('Should create document with Mermaid subgraph content');
+  }
+
+  // NEW STATUS WORKFLOW TESTS
+  async testStatusWorkflowProgression() {
+    // Test the complete workflow: Todo → InProgress → ReadyForReview → UnderReview → Done
+    const createResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Workflow Test Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=todo']);
+    
+    const createText = createResult.content?.[0]?.text || '';
+    const createData = JSON.parse(createText);
+    const taskId = createData.id;
+    
+    // Progress through each status
+    const statuses = ['in_progress', 'ready_for_review', 'under_review', 'done'];
+    
+    for (const status of statuses) {
+      const updateResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'update_task', 
+        '--tool-arg', `task_id=${taskId}`, '--tool-arg', `status=${status}`]);
+      
+      const updateText = updateResult.content?.[0]?.text || '';
+      const updateData = JSON.parse(updateText);
+      
+      if (updateData.status !== status) {
+        throw new Error(`Failed to update task to ${status} status`);
+      }
+    }
+  }
+
+  async testReadyForReviewFiltering() {
+    // Create tasks with different statuses including ReadyForReview
+    const createReady = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Ready Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=ready_for_review']);
+    
+    const createProgress = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Progress Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=in_progress']);
+    
+    // Test filtering by ReadyForReview status
+    const filterResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_tasks',
+      '--tool-arg', 'project_id=1', '--tool-arg', 'status=["ready_for_review"]']);
+      
+    const filterText = filterResult.content?.[0]?.text || '';
+    if (!filterText.includes('Ready Task') || filterText.includes('Progress Task')) {
+      throw new Error('ReadyForReview filtering should only return ReadyForReview tasks');
+    }
+  }
+
+  async testUnderReviewFiltering() {
+    // Create a task in UnderReview status
+    const createUnder = await this.execMCP(['--method', 'tools/call', '--tool-name', 'create_task', 
+      '--tool-arg', 'project_id=1', '--tool-arg', 'title=Under Review Task', '--tool-arg', 'task_type=task',
+      '--tool-arg', 'status=under_review']);
+    
+    // Test filtering by UnderReview status
+    const filterResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_tasks',
+      '--tool-arg', 'project_id=1', '--tool-arg', 'status=["under_review"]']);
+      
+    const filterText = filterResult.content?.[0]?.text || '';
+    if (!filterText.includes('Under Review Task')) {
+      throw new Error('UnderReview filtering should return UnderReview tasks');
+    }
+  }
+
+  async testCombinedStatusFiltering() {
+    // Test filtering by multiple statuses including new ones
+    const filterResult = await this.execMCP(['--method', 'tools/call', '--tool-name', 'list_tasks',
+      '--tool-arg', 'project_id=1', '--tool-arg', 'status=["ready_for_review", "under_review", "done"]']);
+      
+    const filterText = filterResult.content?.[0]?.text || '';
+    if (!filterText.includes('data')) {
+      throw new Error('Combined status filtering should return results');
+    }
   }
 
   async testSQLInjectionLikeContent() {
@@ -789,7 +863,12 @@ This creates a large document with repetitive content and code blocks.`;
       { name: 'string_id_where_number_expected', fn: () => this.testStringIdWhereNumberExpected() },
       { name: 'empty_required_string', fn: () => this.testEmptyStringRequired() },
       { name: 'unauthorized_access', fn: () => this.testUnauthorizedAccess() },
-      { name: 'live_integration_workflow', fn: () => this.testLiveIntegrationWorkflow() }
+      { name: 'live_integration_workflow', fn: () => this.testLiveIntegrationWorkflow() },
+      // New Status Workflow Tests
+      { name: 'status_workflow_progression', fn: () => this.testStatusWorkflowProgression() },
+      { name: 'ready_for_review_filtering', fn: () => this.testReadyForReviewFiltering() },
+      { name: 'under_review_filtering', fn: () => this.testUnderReviewFiltering() },
+      { name: 'combined_status_filtering', fn: () => this.testCombinedStatusFiltering() }
     ];
   }
 

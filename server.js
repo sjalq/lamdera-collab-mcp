@@ -191,7 +191,7 @@ class CollabMCP {
               },
               status: {
                 type: "string",
-                enum: ["todo", "in_progress", "review", "done", "blocked"],
+                enum: ["todo", "in_progress", "ready_for_review", "under_review", "done", "blocked", "abandoned"],
                 default: "todo",
               },
               priority: {
@@ -207,7 +207,7 @@ class CollabMCP {
         },
         {
           name: "update_task",
-          description: "Update task",
+          description: "Update task properties including status transitions. Common workflows: Mark work complete (InProgress → ReadyForReview), Approve review (UnderReview → Done), Block task (any status → Blocked), Abandon task (any status → Abandoned). Use take_next_task for Todo→InProgress, take_next_review_task for ReadyForReview→UnderReview, and task_reject_review for UnderReview→Todo.",
           inputSchema: {
             type: "object",
             required: ["task_id"],
@@ -217,7 +217,7 @@ class CollabMCP {
               description: { type: "string" },
               status: {
                 type: "string",
-                enum: ["todo", "in_progress", "review", "done", "blocked"],
+                enum: ["todo", "in_progress", "ready_for_review", "under_review", "done", "blocked", "abandoned"],
               },
               priority: {
                 type: "string",
@@ -349,7 +349,7 @@ class CollabMCP {
         },
         {
           name: "take_next_task",
-          description: "Get the next task to work on: Automatically selects the highest priority (lowest order number) Todo task in the project and marks it as InProgress. This is the primary way to pick which task to work on next. Returns the task with all its comments. Only one task can be InProgress per project (use force=true to override).",
+          description: "Get the next task to work on: Automatically selects the highest priority (lowest order number) Todo task in the project and marks it as InProgress. This is the primary way to pick which task to work on next. Returns the task with all its comments. The system will NOT let you pick new tickets if there are tasks InProgress OR UnderReview (use force=true to override).",
           inputSchema: {
             type: "object",
             required: ["project_id"],
@@ -361,7 +361,7 @@ class CollabMCP {
         },
         {
           name: "take_next_review_task",
-          description: "Get the next task to review: Automatically selects the highest priority (lowest order number) task that's in Review status and marks it as InProgress for you to work on. Use this when you want to review tasks rather than work on new ones. Returns the task with all its comments. Only one task can be InProgress per project (use force=true to override).",
+          description: "Get the next task to review: Automatically selects the highest priority (lowest order number) task that's ReadyForReview and marks it as UnderReview for you to review. Use this when you want to review tasks rather than work on new ones. Returns the task with all its comments. Only one task can be UnderReview per project (use force=true to override).",
           inputSchema: {
             type: "object",
             required: ["project_id"],
@@ -394,14 +394,14 @@ class CollabMCP {
         },
         {
           name: "task_reject_review",
-          description: "Reject a task that's in Review status back to Todo with a comment explaining why. The task will be moved to the front of the Todo queue (highest priority). This creates a comment with the rejection reason for tracking purposes.",
+          description: "Reject a task that's UnderReview back to Todo with a comment explaining why. The task will be moved to the front of the Todo queue (highest priority). This creates a comment with the rejection reason for tracking purposes.",
           inputSchema: {
             type: "object",
             required: ["task_id", "reviewer_comment"],
             properties: { 
               task_id: { 
                 type: "number",
-                description: "The ID of the task to reject from review"
+                description: "The ID of the UnderReview task to reject back to Todo"
               },
               reviewer_comment: {
                 type: "string",
